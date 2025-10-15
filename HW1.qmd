@@ -1,0 +1,524 @@
+---
+title: "HW1 Computational statistics"
+author: "Ester"
+date: today
+format:
+  pdf:
+    self-contained: true
+editor: visual
+---
+
+```{r, echo=FALSE}
+set.seed(97)
+```
+
+# Problem 1
+
+## (a) Simulate with Accept-Reject algorithm
+
+The probability density we want to simulate is plotted below. (Figure 1)
+
+```{r, echo=FALSE}
+curve(cos(x), 0, pi/2, main = "Figure 1: pdf of cos(x)")
+```
+
+The function has a high point of 1 at $x = 0$, and a low point of 0 at $x =\pi/2$. The function has a constant decline in a bowlike motion.
+
+We are going to approximate the pdf by simulating from a $Uniform(0,\pi/2)$-distribution. This uniform-function has a high point of $2/\pi$ ($base*height = \frac{\pi}{2}*height =1 \rightarrow height = 2/\pi$) which is constant through all x. x goes from $0 \le x \le \frac{\pi}{2}$, just like our target pdf.
+
+Below is a plot of our target pdf f(x) together with the uniform distribution g(x) we are simulating from (Figure 2). As you can see, the uniform distribution does not cover the whole target. To fix this, we are creating an envelope $e(°)$ by multiplying g(x) with a constant $\alpha$, so that $e(°) = \alpha g(x) \ge f(x)$ for all x (Figure 3).
+
+```{r, echo = FALSE}
+#Plot the uniform distribution over the target distribution
+
+plot(NA, xlim = c(0, pi/2), ylim = c(0, 1 * 1.1), type = "n", ylab = "f(x), g(x)", xlab = "x", main = "Figure 2: pdf of cos(x) and g(x)") #cos(x)
+
+#Horizontal line of Unifrom
+segments(x0 = 0, y0 = 2/pi, x1 = pi/2, y1 = 2/pi, lwd = 2)
+
+#Vertical lines of Uniform
+segments(x0 = 0, y0 = 0, x1 = 0, y1 = 2/pi, lty = 2)
+segments(x0 = pi/2, y0 = 0, x1 = pi/2, y1 = 2/pi, lty = 2)
+curve(cos(x), 0, pi/2, add = TRUE)
+```
+
+$e(°)$ *envelopes* the highest point of $f(x)$ for all x. Maximum value is cos(0) = 1. This means that
+
+$$
+\alpha = \frac{f(0)}{g(0)} = \frac{1}{2/\pi} = \pi/2
+$$
+
+```{r, echo = FALSE}
+#Plot the uniform distribution over the target distribution
+
+plot(NA, xlim = c(0, pi/2), ylim = c(0, 1 * 1.1), type = "n", ylab = "f(x), e(°)", xlab = "x", main = "Figure 3: pdf of cos(x) and e(°)") #cos(x)
+
+#Horizontal line of Unifrom
+segments(x0 = 0, y0 = 1, x1 = pi/2, y1 = 1, lwd = 2)
+
+#Vertical lines of Uniform
+segments(x0 = 0, y0 = 0, x1 = 0, y1 = 1, lty = 2)
+segments(x0 = pi/2, y0 = 0, x1 = pi/2, y1 = 1, lty = 2)
+curve(cos(x), 0, pi/2, add = TRUE)
+```
+
+The steps in Accept-Reject algorithm:
+
+1.  Draw Y from g(x)
+2.  Draw U from Uniform(0,1)
+3.  Accept Y if $U < f(Y)/e(°)$. If Y is accepted, let Y = X and consider X to be a part of the target random sample.
+
+## (b) Theoretical vs empirical acceptance ratio
+
+Theoretical acceptance ratio is the area under f(x) divided by the area under e(°):
+
+$$
+\frac{\int{f(x)dx}}{\int{e(°)dx}} = 
+\frac{1}{\int{\alpha * g(x)dx}} = 
+\frac{1}{\alpha\int{g(x)dx}} =
+\frac{1}{\alpha*1} =
+\frac{1}{\pi/2} = 2/\pi = 0.6366
+$$
+
+Estimated acceptance ratio is the number of aceepted simulated samples divided by n:
+
+$$
+\text{Accepted sample length} / n = 6384/10^4 = 0.6384
+$$ They are very similar.
+
+```{r, echo=FALSE}
+#Sample size 
+n = 10^4
+
+#alpha
+alpha = pi/2
+
+#Step 1: draw from the more simple distribution 
+Y <- runif(n = n, min = 0, max = pi/2)
+
+#Step 2: draw from U(0,1) distribution 
+U <- runif(n = n, min = 0, max = 1)
+
+#Step 3: Accept if... 
+my_sample <- c() 
+for(i in 1:n){ 
+  if(U[i] <= cos(Y[i])/ (alpha*dunif(Y[i], min = 0, max = pi/2))) { 
+    my_sample <- c(my_sample, Y[i]) 
+  } 
+}
+```
+
+## (c) Histogram over simulated sample and f(x) = cos(x)
+
+```{r, echo=FALSE}
+hist(my_sample, probability = TRUE, ylim = c(0, 1.1), main = "Histogram over simulated sample and f(x) = cos(x)", xlab = "x"); curve(cos(x), 0, pi/2, col = "blue", add = TRUE)
+```
+
+The Accept-Reject algorithm was pretty accurate in its simulation, both in terms of theoretical vs empirical acceptance ratio and in coverage visually.
+
+# Problem 2
+
+The integral we want to estimate:
+
+$$
+\theta = \int_0^1 e^{2x} \cos(x) \sin(x)\, dx
+$$
+
+The function f(x) = exp(2x)cos(x)sin(x) looks like below plot (Figure 5). $\theta$ is the area under the curve.
+
+```{r, echo=FALSE}
+#create function and plotting the pdf
+myfunction <- function(x) exp(2*x)*cos(x)*sin(x)
+curve(myfunction, 0, 1, main = "Figure 5: pdf of f(x) = exp(2x)cos(x)sin(x)", ylab = "f(x)")
+```
+
+## 2.1. Deterministic methods
+
+### 2.1.1. Newton-Cotes Quadrature (Equidistant) methods
+
+Equidistant methods in numerical integration all follows the same base method. Divide the integral into n non-overlapping subintervals $(x_i, x_{i+1}), i = 0, 1, ..., n-1, x_0=a, x_n = b$. Then, calculate each subinterval and add them together. There are different methods on how to calculate each subinterval, some which are presented below to approximate $\theta$.
+
+#### (1) Riemann rule
+
+We start off with the Riemann rule, which is one of the simplest forms of numerical integration. The way you calculate each subinterval is by calculating them like narrow rectangles, choosing the height to be either, where the rectangle hits f(x) on the left; $f(x_i)$ on the right; $f(x_{i+1})$, or on the average of thw two $\frac{f(x_i + x_{i+1})}{2}$. The "width" is always $x_{i+1} - x_i$. See formulas below:
+
+$$
+\hat{I}^{-}_R(n) = \sum_{i=0}^{n-1} f(x_i)(x_{i+1} - x_i)
+$$
+
+$$
+\hat{I}^{+}_R(n) = \sum_{i=0}^{n-1}f(x_{i+1})(x_{i+1} - x_i)
+$$
+
+$$
+\hat{I}^{\text{mid}}_R(n) = \sum_{i=0}^{n-1}f\left( \frac{x_i + x_{i+1}}{2} \right)(x_{i+1} - x_i)
+$$
+
+In these three cases, the subintervals are all equally spaced. This means you could interchange $x_{i+1} - x_i$ for $h = (b-a)/n$. and $x_i$ for $a + ih$ for easy implementation. I choose the $\hat{I}^{-}_R(n)$ method because I want to start by estimating $\theta$ in one of the most easiest, simplest of ways. I then need to choose n. The riemann method converges pretty slow, so the more subintervals, the more accurate the approximation gets. Therefore, I choose n = 100. See estimation below.
+
+```{r, echo=FALSE}
+#Riemann rule
+riemann <- function(n, a, b, fun){
+  
+  h <- (b-a)/n
+  theta <- 0
+  
+  for (i in 0:(n-1)){
+    theta <- theta + fun(a + i*h)
+  }
+  theta <- h*theta
+  
+  return(theta)
+}
+```
+
+```{r, echo=FALSE}
+theta1 <- riemann(n = 100, a = 0, b = 1, fun = myfunction)
+#theta1_n10 <- riemann(n = 10, a = 0, b = 1, fun = myfunction)
+
+#cat("theta1 with n = 10: ", theta1_n10, "\n")
+cat("theta1 with n = 100: ", theta1)
+```
+
+#### (2) Trapezoidal rule
+
+Below is the formula for a general Trapezoidal integration approximation between the range a and b, where $h=\frac{b-a}{n}$, which represents the width of each subinterval. The Trapezoidal rule averages two endpoints and does therefore tend to give a better approximation than Riemann, who only uses one point.
+
+$$
+\hat{I}_T(n)=\int_a^b f(x)\, dx \approx \frac{h}{2} f(a) + h \sum_{i=1}^{n-1} f(a + ih) + \frac{h}{2} f(b)
+$$
+
+I chose n = 100 for Riemann. However, Trapezoid converges faster than Riemann and does not need as many subintervals. To present this method in a fair way, I want to show how it can give a good estimation even with a lower n. Because of this, I choose n = 10. See estimation below.
+
+```{r, echo=FALSE}
+#Trapezoid rule
+trapezoid <- function(n, a, b, fun){
+  
+  h <- (b-a)/n
+  start <- (h/2)*fun(a)
+  end <- (h/2)*fun(b)
+  middle <- 0
+  
+  for (i in 1:(n-1)){
+    middle <- middle + h*fun(a + i*h)
+  }
+  
+  theta <- start + middle + end
+  
+  return(theta)
+}
+```
+
+$\theta_2$ is approximated to be:
+
+```{r, echo=FALSE}
+theta2 <- trapezoid(n = 10, a = 0, b = 1, fun = myfunction)
+#theta2_n100 <- trapezoid(n = 100, a = 0, b = 1, fun = myfunction)
+
+cat("theta2 with n = 10: ", theta2, "\n")
+#cat("theta2 with n = 100: ", theta2_n100)
+```
+
+#### (3) Simpson´s rule
+
+The simpson´s rule uses both endpoints and midpoints through each subinterval and is therefore able to give even more accurately results cpompared to the previous two. This method also converges fast, and does not need that many subintervals. It does however need an even number n to work correctly.
+
+$$
+\hat{I}_S(n) = \frac{h}{3} \left[ f(a) + 4 \sum_{i=1}^{n/2} f(x_{2i - 1}) + 2 \sum_{i=1}^{n/2 - 1} f(x_{2i}) + f(b) \right]
+$$
+
+This can also be written as:
+
+$$
+\hat{I}_S(n) = \frac{h}{3} \sum_{i=1}^{n/2} \left[ f(x_{2i - 2}) + 4f(x_{2i - 1}) + f(x_{2i}) \right]
+$$
+
+I keep n = 10 to compare to previous method, also it is an even number which is needed.
+
+```{r, echo=FALSE}
+#Simpson´s rule
+simpsons <- function(n, a, b, fun){
+  if (n %% 2 != 0){
+    break
+  }
+  h <- (b-a)/n
+  middle <- 0
+  
+  for (i in 1:(n/2)){
+    middle <- middle + (fun(a + (2*i-2)*h) + 4*fun(a + (2*i-1)*h) + fun(a + (2*i)*h))
+  }
+
+  theta <- (h/3)*middle
+  return(theta)
+}
+```
+
+```{r, echo=FALSE}
+theta3 <- simpsons(n = 10, a = 0, b = 1, fun = myfunction)
+#theta3_n100 <- simpsons(n = 100, a = 0, b = 1, fun = myfunction)
+
+cat("theta3 with n = 10: ", theta3, "\n")
+#cat("theta3 with n = 100: ", theta3_n100)
+```
+
+### 2.1.2. Non equidistant methods
+
+Where the integration points $x_i$ are not equally spaced. Instead, they are chosen as roots of orthogonal polynomials, and each has an associated weight $A_i$.
+
+#### (4) Gaussian Quadrature (Legendre)
+
+General formula for Gaussian Quadrature approximation:
+
+$$
+\int_a^b f(x)\, w(x)\, dx \approx \sum_{i=1}^{n} A_i\, f(x_i)
+$$
+
+When it comes to Gaussian Quadrature, there are a few things to consider when choosing method. One is the range of the function, which in my case is \[0,1\]. If the gaussian method uses an interval between \[-∞,∞\] or \[0,∞\], it is difficult (or at least not ideal) to use on a finite interval since you have to transform it before using. In my case, this excludes methods such as Laguerre and Hermite.
+
+Another thing you need to consider is the weight function $w(x)$. Since my integral has no clear weight function of the form $e^{-x}$ or $e^{-x^2}$ for example, the best gaussian method to use for my integral is Legendre, which has a weight function that is just $w(x) = 1$ . The interval on Legendre method goes from \[-1,1\], but I can transfrom my integral so that my intervals match Legendres, see below.
+
+$$
+\int_0^1 f(x)\, dx = \frac{1}{2} \int_{-1}^1 f\left( \frac{x + 1}{2} \right)\, dx
+$$
+
+In R, there is an existing function that approximates via gaussian Legendre, where you can also choose which interval to approximate through. Since i have not seen any information regarding if we are supposed to build the functions ourselves or not, I choose to use this existing function.
+
+If the function f(x) is a polynomial at degree less or equal to 2n-1, we can exactly represent the integral with gaussian quadrature. My function is not a polynomial, so this rule is not directly applicable in my case. However, I can use it to get an idea of how many n nodes i need. I do not need many, since even n = 5 would be able to exactly calculate an integral with a 2\*5-1 = 9 degree polynomial function. I choose n = 6, and am interested to see if this is a better approximation than previous methods.
+
+```{r, echo=FALSE}
+#Gaussian Quadrature: Legendre
+#install.packages("statmod")
+library(statmod)
+out <- gauss.quad(n = 6, kind = "legendre", alpha = 0, beta = 1)
+
+theta4 <- sum(0.5*out$weights * myfunction(0.5*(out$nodes  + 1)))
+```
+
+```{r, echo=FALSE}
+cat("theta4 with n = 6: ", theta4)
+```
+
+## 2.2. Stochastic methods
+
+#### (5) Naive Monte Carlo integration
+
+The general idea of a simple (naive) monte carlo integration is that you generate sample draws from a distribution, then put the draws into the h(x) function and take the average. See below.
+
+$$
+\hat{\theta}_{\text{MC}} = \frac{1}{n} \sum_{i=1}^{n} h(\mathbf{X}_i) \rightarrow \int h(\mathbf{x}) f(\mathbf{x})\, d\mathbf{x} = \mathbb{E}_f[h(\mathbf{X})] = \theta
+$$
+
+In our case, there is no natural density f(x), hence we draw samples from a simple $Unif(0,1)$, put the samples through $h(x) = e^{2x} \cos(x) \sin(x)$, and compute the average. To get our final estimate, we then have to multiply the average with the interval range. In our case this is just (1-0)=1, so it doesn't change the estimate.
+
+Since this is a stochastic method, we need a large sample to stabilize the estimate, therefore I have chosen n = 10 000. Even so, this method generates a pretty "large" variance, which is a minus. See theretical variance of the estimate below.
+
+$$
+\operatorname{Var}(\hat{\theta}_{MC}) = \frac{\operatorname{Var}(h(X))}{n}
+$$
+
+```{r, echo=FALSE}
+#Monte carlo integration
+draws <- runif(n = 10000, min = 0, max = 1)
+theta5 <- (1-0)*mean(myfunction(draws))
+```
+
+```{r, echo=FALSE}
+cat("theta5 with n = 10k: ", theta5)
+```
+
+#### (6) Importance sampling
+
+Importance sampling is a variance reduction technique that you apply your Naive Monte Carlo to. As has been shown, Naive Monte Carlo gives you a variance in your estimate that could be bigger than you are comfortable with. Importance sampling introduces a new function g(x) which you sample from instead of f(x), see general formulation below.
+
+$$
+E_f[h(x)] = \int h(\mathbf{x}) f(\mathbf{x})\, d\mathbf{x} = \int h(\mathbf{x}) \frac{f(\mathbf{x})}{g(\mathbf{x})} g(\mathbf{x})\, d\mathbf{x} = \\ E_g[h(x)\frac{f(x)}{g(x)}] = \hat{\mu}_n = \frac{1}{n} \sum_{i=1}^n h(X_i)\,\frac{f(X_i)}{g(X_i)}, \quad X_i \sim g
+$$
+
+To get our estimate, we put the draws we generate through our new weighted function $h(x)\frac{f(x)}{g(x)}$, and then take the average.
+
+As in Naive Monte Carlo, we have $h(x) = e^{2x} \cos(x) \sin(x)$, and $f(x)=1$, so $f(x)$ disappears from the formula. When choosing $g(x)$ you want to make sure the "support" is the same, meaning both h(x) and g(x) support the same interval. You also want to plot them over each other in the same graph to see how well they match. n still has to be large, so to compare it to the previopus method I keep n = 10 000. Our variance becomes: $\operatorname{Var}(\hat{\theta}_{IS})
+= \frac{1}{n} \operatorname{Var}_g\!\left( \frac{h(X)}{g(X)} \right)$, which should be lower than the variance from naive monte carlo, giving a better estimate. In below graph we can see that $Beta(\alpha = 3, \beta = 1)$ (pink) follows the curve of the target distribution. In the Beta-distribution, x is supported through 0 to 1, so we can use it.
+
+```{r, echo=FALSE}
+curve(myfunction, from = 0, to = 1, ylab = "f(x), g(x)", main = "Figure 6: pdf of f(x) (black) and g(x) (pink)");
+curve(dbeta(x, 3, 1), from = 0, to = 1, add = TRUE, col = "pink")
+```
+
+```{r, echo=FALSE}
+#Importance sampling
+draws <- rbeta(n = 10000, shape1 = 3, shape2 = 1)
+theta6 <- mean(myfunction(draws)/dbeta(draws, shape1 = 3, shape2 = 1))
+```
+
+```{r, echo=FALSE}
+cat("theta6 with n = 10k: ", theta6)
+```
+
+## Discussion
+
+Since we do not have the true value of $\theta$, we cannot be completely sure which estimate is the best. We can however see that most estimates are close to 1.35. Gauss–Legendre is expected to be highly accurate for smooth functions and can be treated as a benchmark. Simpsons's and Importance sampling's estimates also being 1.349 suggests it is a good estimate of $\theta$. Simpson's is the most advanced out of the three equidistant methods, and it can be seen when looking at the estimates; Riemann has the most far off estimate out of them, even though it used ten times as many samples. Even though Trapezoid uses the same sample size, it's estimate is not quite as precise as Simpson's. We expected Naive Monte Carlo to have a larger variance, especially since we had chosen a simple uniform distribution to sample from. The importance sampling reduces that variance, and since its estimate is so similar to Gauss and Simpsons, this tells me that 1.349 is a good estimate of $\theta$.
+
+```{r, echo=FALSE}
+# Create a data frame
+results <- data.frame(
+  Method = c("Riemann", "Trapezoid", "Simpson´s",
+             "Gauss–Legendre", "Naive Monte Carlo", "Importance Sampling"),
+  Estimate = c(theta1, theta2, theta3, theta4, theta5, theta6)
+)
+
+# Print the table
+results[1:6,]
+```
+
+# Appendix
+
+```{r, eval=FALSE}
+set.seed(97)
+```
+
+#### Problem 1
+
+```{r, eval=FALSE}
+#a)
+cos(0) #highpoint of target pdf
+cos(pi/2) #lowpoint of target pdf
+```
+
+```{r, eval=FALSE}
+#Sample size 
+n = 10^4
+
+#alpha
+alpha = pi/2
+
+#Step 1: draw from the more simple distribution 
+Y <- runif(n = n, min = 0, max = pi/2)
+
+#Step 2: draw from U(0,1) distribution 
+U <- runif(n = n, min = 0, max = 1)
+
+#Step 3: Accept if... 
+my_sample <- c() 
+for(i in 1:n){ 
+  if(U[i] <= cos(Y[i])/ (alpha*dunif(Y[i], min = 0, max = pi/2))) { 
+    my_sample <- c(my_sample, Y[i]) #if accept, add Y to the sample
+  } 
+}
+```
+
+```{r}
+#b)
+length(my_sample)/n #Empirical acceptance ratio
+```
+
+```{r, eval=FALSE}
+#c) Code for my histogram
+hist(my_sample, probability = TRUE, ylim = c(0, 1.1)); 
+curve(cos(x), 0, pi/2, col = "blue", add = TRUE)
+```
+
+#### Problem 2
+
+```{r, eval=FALSE}
+#defining function and plotting the pdf
+myfunction <- function(x) exp(2*x)*cos(x)*sin(x)
+curve(myfunction, 0, 1, main = "Figure 5: pdf of f(x) = exp(2x)cos(x)sin(x)", 
+      ylab = "f(x)")
+```
+
+```{r, eval=FALSE}
+#Riemann rule
+riemann <- function(n, a, b, fun){
+  
+  h <- (b-a)/n #step size
+  theta <- 0
+  
+  for (i in 0:(n-1)){
+    theta <- theta + fun(a + i*h) #sum the thetas for each iteration
+  }
+  theta <- h*theta #multiply by the step size
+  
+  return(theta)
+}
+
+theta1 <- riemann(n = 100, a = 0, b = 1, fun = myfunction)
+```
+
+```{r, eval=FALSE}
+#Trapezoid rule
+trapezoid <- function(n, a, b, fun){
+  
+  h <- (b-a)/n #step size
+  
+  #start and end part of the estimator function
+  start <- (h/2)*fun(a) 
+  end <- (h/2)*fun(b)
+  middle <- 0 #middle part, fills in with for loop below
+  
+  for (i in 1:(n-1)){
+    middle <- middle + h*fun(a + i*h)
+  }
+  
+  theta <- start + middle + end #add them all together
+  
+  return(theta)
+}
+
+theta2 <- trapezoid(n = 10, a = 0, b = 1, fun = myfunction)
+```
+
+```{r, eval=FALSE}
+#Simpson´s rule
+simpsons <- function(n, a, b, fun){
+  if (n %% 2 != 0){
+    break
+  }
+  h <- (b-a)/n #step size
+  middle <- 0
+  
+  for (i in 1:(n/2)){
+    middle <- middle + (fun(a + (2*i-2)*h) + 4*fun(a + (2*i-1)*h) + 
+                          fun(a + (2*i)*h)) 
+    #the middle is the whole part here, i just call it middle.
+  }
+
+  theta <- (h/3)*middle
+  
+  return(theta)
+}
+
+theta3 <- simpsons(n = 10, a = 0, b = 1, fun = myfunction)
+```
+
+```{r, eval=FALSE}
+#Gaussian Quadrature: Legendre
+#install.packages("statmod")
+library(statmod)
+out <- gauss.quad(n = 6, kind = "legendre", alpha = 0, beta = 1)
+
+theta4 <- sum(0.5*out$weights * myfunction(0.5*(out$nodes  + 1)))
+```
+
+```{r, eval=FALSE}
+#Monte carlo integration
+draws <- runif(n = 10000, min = 0, max = 1) #unif(0,1) draws
+theta5 <- (1-0)*mean(myfunction(draws))
+```
+
+```{r, eval=FALSE}
+#Importance sampling
+draws <- rbeta(n = 10000, shape1 = 3, shape2 = 1)
+theta6 <- mean(myfunction(draws)/dbeta(draws, shape1 = 3, shape2 = 1))
+```
+
+```{r, eval=FALSE}
+# Create a data frame
+results <- data.frame(
+  Method = c("Riemann", "Trapezoid", "Simpson", "Gauss–Legendre", 
+             "Naive Monte Carlo", "Importance Sampling"),
+  Estimate = c(theta1, theta2, theta3, theta4, theta5, theta6)
+)
+
+# Print the table
+print(results)
+```

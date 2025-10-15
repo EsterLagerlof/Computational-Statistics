@@ -1,0 +1,196 @@
+---
+title: "HW2 Computational statistics"
+author: "Ester"
+date: today
+format:
+  pdf:
+    self-contained: true
+editor: visual
+---
+
+### a)
+
+In this exercise, I create a function in R that runs the SIS-process. The inputs that are changeable are number of infected at day zero, $I_0$, number of time points (I interpret this as days) the simulation is going on for, total population $N$, $a$ for the max(min())-function, as well as inputs for the parameters $\beta, \gamma \text{ and } \sigma$.
+
+The Three processes can be seen in Figure 1 below. The deterministic path has a smooth decline under all 1800 days. The stochastic paths behave more randomly and do not follow each other. The black path drops down to zero a lot throughout the process. The blue path has a big spike at the end, and some spikes earlier as well. The two stochastic paths differ only due to the random $\epsilon_t$ draws, since all parameters and initial conditions are the same. So the random part of the SIS-model makes a big relative difference in how the infection is going to spread.
+
+```{r, echo = FALSE, message=FALSE}
+library(dplyr)
+library(tidyverse)
+set.seed(97)
+
+beta <- 0.001
+gamma <- 0.002
+sigma <- 0.03
+N <- 100
+a <- 0.01
+I_0 <- 10
+
+#Make SIS model function
+SIS_model <- function (I_0, days, beta, gamma, sigma, N, a) {
+  I <- c(I_0)
+  for (t in 1:days) {
+    I[t+1] <- I[t] + beta*(I[t]/N)*(N-I[t]) - gamma*I[t] + sigma*sqrt(I[t]*(N-I[t]))*rnorm(n = 1, mean = 0, sd = 1) #the function
+    I[t+1] <- max(min(I[t+1], N-a), a)
+  }
+  return(I)
+}
+
+#Stochastic model 1
+stoch_m1 <- SIS_model(I_0 = I_0, days = 1800, beta = beta, gamma = gamma, sigma = sigma, N = N, a = a)
+
+#Stochastic model 2
+stoch_m2 <- SIS_model(I_0 = I_0, days = 1800, beta = beta, gamma = gamma, sigma = sigma, N = N, a = a)
+
+#Deterministic model where sigma = 0 
+deter_m <- SIS_model(I_0 = I_0, days = 1800, beta = beta, gamma = gamma, sigma = 0, N = N, a = a)
+
+#Combine them in one dataframe
+df <- data.frame("Stockastic 1" = stoch_m1, "Stochastic 2" = stoch_m2, "Deterministic" = deter_m)
+```
+
+```{r, echo=FALSE}
+plot <- ggplot(df, aes(x = seq(1, 1801, 1))) +
+  geom_line(aes(y = stoch_m1), color = "grey30") +
+  geom_line(aes(y = stoch_m2), color = "dodgerblue3") +
+  geom_line(aes(y = deter_m), color = "red") + 
+  labs(title = "Three simulations of the speading of infection", subtitle = "Stochastic processes (black, blue), deterministic process (red)", x = "Time (days)", y = "People infected") + 
+  theme_minimal()
+
+print(plot)
+```
+
+### b)
+
+To get an estimate of the probability we are seeking, we have to simulate a number of stochastic processes like above (1800 days each), and record how many paths exceed 0.2\*100=20 number of infected. If the number of infected exceeds 20 more than once during one single process, it will only count once.
+
+We calculate $\hat{p}$ with:
+
+$$
+\frac{\text{Number of processes where infected exceeds 20}}{\text{Total number of processes = n = 1000}}
+$$
+
+We then calculate the confidence interval like below, with $\alpha = 0.05, n = 1000$
+
+$$
+\hat{p} \pm z_{\alpha/2} \sqrt{ \frac{ \hat{p}(1 - \hat{p}) }{n} }
+$$
+
+Result is:
+
+$\hat{p} = 0.023 = 2.3\%$.
+
+$95\% \space CI: [0.014;0.032]$
+
+The probability that the number of infected $I_t$ at some timepoint between 0 and 1800 days will exceed 20%, is around 2.3%, and has a 95%-confidence interval between 1.4% and 3.2%.
+
+## Appendix
+
+### a)
+
+```{r, eval=FALSE}
+library(dplyr)
+library(tidyverse)
+set.seed(97)
+```
+
+```{r, eval=FALSE}
+beta <- 0.001
+gamma <- 0.002
+sigma <- 0.03
+N <- 100
+a <- 0.01
+I_0 <- 10
+```
+
+```{r, eval=FALSE}
+#Make SIS model function
+SIS_model <- function (I_0, days, beta, gamma, sigma, N, a) {
+  I <- c(I_0) #initialize I_t with I_0
+  for (t in 1:days) {
+    I[t+1] <- I[t] + beta*(I[t]/N)*(N-I[t]) - gamma*I[t] + 
+      sigma*sqrt(I[t]*(N-I[t]))*rnorm(n = 1, mean = 0, sd = 1) #The function 
+    
+    #modification to ensure that simulated values I remains in (0, N)
+    I[t+1] <- max(min(I[t+1], N-a), a) 
+  }
+  return(I)
+}
+```
+
+```{r, eval=FALSE}
+#Stochastic model 1
+stoch_m1 <- SIS_model(I_0 = I_0, days = 1800, beta = beta, 
+                      gamma = gamma, sigma = sigma, N = N, a = a)
+```
+
+```{r, eval=FALSE}
+#Stochastic model 2
+stoch_m2 <- SIS_model(I_0 = I_0, days = 1800, beta = beta, 
+                      gamma = gamma, sigma = sigma, N = N, a = a)
+```
+
+```{r, eval=FALSE}
+#Deterministic model where sigma = 0 
+deter_m <- SIS_model(I_0 = I_0, days = 1800, beta = beta, 
+                     gamma = gamma, sigma = 0, N = N, a = a)
+```
+
+```{r, eval=FALSE}
+#Combine them in one dataframe
+df <- data.frame("Stockastic 1" = stoch_m1, "Stochastic 2" = stoch_m2, 
+                 "Deterministic" = deter_m)
+```
+
+```{r, eval=FALSE}
+#plot of the paths
+plot <- ggplot(df, aes(x = seq(1, 1801, 1))) +
+  geom_line(aes(y = stoch_m1), color = "grey30") +
+  geom_line(aes(y = stoch_m2), color = "dodgerblue3") +
+  geom_line(aes(y = deter_m), color = "red") + 
+  labs(title = "Figure 1. Three simulations of the speading of infection", 
+       subtitle = "Stochastic processes (black, blue), deterministic process (red)", 
+       x = "Time (days)", y = "People infected") + 
+  theme_minimal()
+
+print(plot)
+```
+
+```{r, eval=FALSE}
+#min and max values of the processes
+min(stoch_m1,stoch_m2,deter_m)
+max(stoch_m1,stoch_m2,deter_m)
+```
+
+### b)
+
+```{r, eval=FALSE}
+
+n_sim <- 1000
+threshold <- 0.2 * N
+n_over_threshold <- 0
+
+for (i in 1:n_sim) {
+  I <- SIS_model(I_0 = I_0, days = 1800, beta = beta, gamma = gamma, 
+                 sigma = sigma, N = N, a = a) #Simulate 1000 times
+  if (any(I > threshold)) { #increment n_over_threshold if the I exceeds 20%
+    n_over_threshold <- n_over_threshold + 1
+  }
+}
+
+#Calculate the probability
+prob_estimate <- n_over_threshold / n_sim
+
+#Calculate standard error
+se <- sqrt(prob_estimate * (1 - prob_estimate) / n_sim)
+
+#Calculate confidence interval
+ci_lower <- prob_estimate - 1.96 * se
+ci_upper <- prob_estimate + 1.96 * se
+```
+
+```{r, eval=FALSE}
+#95% CI for p_hat
+round(data.frame("Lower" = ci_lower, "p_hat" = prob_estimate, 
+                 "Upper" = ci_upper), 3)
+```
